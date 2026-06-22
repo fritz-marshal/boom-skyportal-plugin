@@ -37,6 +37,7 @@ from skyportal.models import (
     Candidate,
     DBSession,
     Filter,
+    Group,
     Instrument,
     Obj,
     ObjToSuperObj,
@@ -627,6 +628,7 @@ def process_record(
                 if group_name is None: # if nickname is not present, use the name
                     group_name = filt["group"]["name"]
                 origin = f"{group_name}:{filt['name']}"
+                group = session.get(Group, filt["group"]["id"])
 
                 existing_annotation = session.scalar(
                     sa.select(Annotation).filter(
@@ -635,13 +637,19 @@ def process_record(
                 )
                 if existing_annotation is None:
                     annotation = Annotation(
-                        obj=obj, data=annotation_data, origin=origin, author_id=1
+                        obj=obj,
+                        data=annotation_data,
+                        origin=origin,
+                        author_id=1,
+                        groups=[group] if group is not None else [],
                     )
                     session.add(annotation)
                     log(f"Created annotation with origin {origin}")
                 else:
                     # we update the data of the annotation
                     existing_annotation.data = annotation_data
+                    if group is not None and group not in existing_annotation.groups:
+                        existing_annotation.groups.append(group)
                     log(f"Updated annotation with origin {origin}")
         except Exception as e:
             log(f"Error processing annotation for object {obj_id} and filter {filt['id']}: {e}")
